@@ -1,0 +1,42 @@
+name: tests
+on: { workflow_dispatch, push: { paths-ignore: [ 'README.md', 'LICENSE' ] } }
+# Configuration
+env:
+  strDirGTest: dir
+  strTestExecutable: test.exe
+jobs:
+  build-tests-gtest:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Get latest gtest version and put to environment (windows-latest)
+        run: | # pwsh
+          $arglist="blahblah"
+          #$strLatest = Start-Process -Wait -NoNewWindow "git" -ArgumentList $arglist
+          $strLatest = $(git $arglist)
+          echo "strLatest=$strLatest" >> $env:GITHUB_ENV
+
+      - name: Cache googleTestLatestRepo
+        uses: actions/cache@v3
+        with:
+          path: ${{env.strDirGTest}}
+          key: cache-key-tool-occ-${{env.strLatest}}
+        id: cache-gtest
+      - name: Download googleTestLatestRepo
+        if: steps.cache-gtest.outputs.cache-hit != 'true'
+        run: | # pwsh
+          $arglist="blahblah"
+          $strLatest = Start-Process "git" -ArgumentList $arglist -Wait 
+          echo "strLatest=$strLatest" >> $env:GITHUB_ENV
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v1.1
+
+      - name: Build test
+        run: MSBuild test/test.sln -noLogo -verbosity:quiet -m -p:Platform=${env:strPlatform} -p:Configuration=${env:strConfiguration} 
+
+      - name: Run test
+        run: | # pwsh
+          $arglist="--logfile?"
+          $strResult = Start-Process -Wait -NoNewWindow "${{env.strTestExecutable}}"

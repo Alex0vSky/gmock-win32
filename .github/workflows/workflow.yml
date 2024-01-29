@@ -11,23 +11,36 @@ jobs:
       - uses: actions/checkout@v3
       
       - name: Download googleTestLatestRepo
-        # working-directory: ${{ env.strDirGTest }}
-        id: download-gtest
+        id: gtest-tag
         uses: pozetroninc/github-action-get-latest-release@master
         with:
           repository: google/googletest
           token: ${{ secrets.GITHUB_TOKEN }}
   
-      - name: Show log
-          # echo "dir2"
-          # dir ${{ env.strDirGTest }}
+      - name: Show log 1
         run: | # pwsh
           echo "dir1"
           dir
-          echo "steps.download-gtest.outputs. ..."
-          echo "release=${{ steps.download-gtest.outputs.release }}"
-          echo "id=${{ steps.download-gtest.outputs.id }}"
-          echo "description=${{ steps.download-gtest.outputs.description }}"
+          echo "release=${{ steps.gtest-tag.outputs.release }}"
+
+      - name: Cache googleTestLatestRepo
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.strDirGTest }}
+          key: cache-key-gtest-${{ steps.gtest-tag.outputs.release }}
+        id: cache-gtest
+
+      - name: Download googleTestLatestRepo
+        if: steps.cache-gtest.outputs.cache-hit != 'true'
+        run: | # pwsh
+          git clone --depth 1 --branch ${{ steps.gtest-tag.outputs.release }} https://github.com/google/googletest.git "${{ env.strDirGTest }}"
+
+      - name: Show log 2
+        run: | # pwsh
+          echo "dir1"
+          dir
+          echo "dir2"
+          dir ${{ env.strDirGTest }}
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v1.1

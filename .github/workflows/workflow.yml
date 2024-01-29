@@ -2,7 +2,7 @@ name: tests
 on: { workflow_dispatch, push: { paths-ignore: [ 'README.md', 'LICENSE' ] } }
 # Configuration
 env:
-  strDirGTest: dir
+  strDirGTest: "ThirdParty"
   strTestExecutable: test.exe
 jobs:
   build-tests-gtest:
@@ -10,33 +10,32 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Get latest gtest version and put to environment (windows-latest)
-        run: | # pwsh
-          $arglist="blahblah"
-          #$strLatest = Start-Process -Wait -NoNewWindow "git" -ArgumentList $arglist
-          $strLatest = $(git $arglist)
-          echo "strLatest=$strLatest" >> $env:GITHUB_ENV
-
-      - name: Cache googleTestLatestRepo
-        uses: actions/cache@v3
-        with:
-          path: ${{env.strDirGTest}}
-          key: cache-key-tool-occ-${{env.strLatest}}
-        id: cache-gtest
       - name: Download googleTestLatestRepo
-        if: steps.cache-gtest.outputs.cache-hit != 'true'
+        # working-directory: ${{ env.strDirGTest }}
+        id: download-gtest
+        uses: pozetroninc/github-action-get-latest-release@master
+        with:
+          repository: google/googletest
+          token: ${{ secrets.GITHUB_TOKEN }}
+  
+      - name: Show log
+          # echo "dir2"
+          # dir ${{ env.strDirGTest }}
         run: | # pwsh
-          $arglist="blahblah"
-          $strLatest = Start-Process "git" -ArgumentList $arglist -Wait 
-          echo "strLatest=$strLatest" >> $env:GITHUB_ENV
+          echo "dir1"
+          dir
+          echo "steps.download-gtest.outputs. ..."
+          echo "release=${{ steps.download-gtest.outputs.release }}"
+          echo "id=${{ steps.download-gtest.outputs.id }}"
+          echo "description=${{ steps.download-gtest.outputs.description }}"
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v1.1
 
-      - name: Build test
-        run: MSBuild test/test.sln -noLogo -verbosity:quiet -m -p:Platform=${env:strPlatform} -p:Configuration=${env:strConfiguration} 
+      # - name: Build test
+        # run: MSBuild test/test.sln -noLogo -verbosity:quiet -m -p:Platform=${env:strPlatform} -p:Configuration=${env:strConfiguration} 
 
-      - name: Run test
-        run: | # pwsh
-          $arglist="--logfile?"
-          $strResult = Start-Process -Wait -NoNewWindow "${{env.strTestExecutable}}"
+      # - name: Run test
+        # run: | # pwsh
+          # $arglist="--logfile?"
+          # $strResult = Start-Process -Wait -NoNewWindow "${{env.strTestExecutable}}"

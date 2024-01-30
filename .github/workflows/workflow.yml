@@ -54,11 +54,11 @@ jobs:
             'user32.lib'
           );
           @( '/std:c++14', '/std:c++17', '/std:c++20', '/std:c++23' ) | % { $strCppVer=$_; }; #later
+          
+          $path = vswhere -products * -requires Microsoft.Component.MSBuild -property installationPath -latest
+          echo $path
           echo "combinations"
           @( 'x86', 'x64' ) | % { $strArch=$_; 
-          @( 'msvc', 'llvm' ) | % { $strToolSet=$_; 
-            $path = vswhere -products * -requires Microsoft.Component.MSBuild -property installationPath -latest
-            echo $path
             if ( 'x64' -eq $strArch ) {
               $path = join-path $path 'VC/Auxiliary/Build/vcvars64.bat'
             }
@@ -68,8 +68,37 @@ jobs:
             cmd /s /c """$path"" $args && set" | where { $_ -match '(\w+)=(.*)' } | foreach {
               $null = new-item -force -path "Env:\$($Matches[1])" -value $Matches[2]
             }
-            Start-Process cl -Wait -NoNewWindow
-            Start-Process clang-cl -ArgumentList '--version' -Wait -NoNewWindow
+          @( 'msvc', 'llvm' ) | % { $strToolSet=$_; 
+            if ( 'msvc' -eq $strToolSet ) {
+              $exe = 'cl'
+              $compile = ''
+            } elseif ( 'llvm' -eq $strToolSet ) {
+              $exe = 'clang-cl'
+              $compile = '-Wno-ignored-pragma-optimize -Wno-microsoft-include -Wno-microsoft-cast -fms-compatibility -fms-extensions '
+            }
+            $compile += ('' +
+            " /EHsc /MP " +
+            " /I""../include"" /I""${{ env.strDirGTest }}/googletest/include"" /I""${{ env.strDirGTest }}/googlemock/include"" " +
+            " ""../src/${{ env.strFirstObj }}.cpp"" " +
+            " ""${{ env.strDirGTest }}/googletest/src/gtest-all.cc"" " +
+            " ""${{ env.strDirGTest }}/googlemock/src/gmock-all.cc"" " +
+            ( $arrSources -join ' ' ) +
+            " /link " +
+            ( $arrLibs -join ' ' ) +
+            " /machine:$strArch " + 
+            '')
+            echo $exe;
+            echo $compile;
+            Start-Process $exe -ArgumentList $compile -Wait -NoNewWindow
+            
+            Start-Process "$env:strFirstObj.exe" -ArgumentList "--gtest_output=xml" -Wait
+            cat "${{ env.strDefaultGtestOutput }}"
+            [xml]$oSystem_Xml_XmlDocument = Get-Content "${{ env.strDefaultGtestOutput }}"
+            $oSystem_Xml_XmlElement = $oSystem_Xml_XmlDocument.GetElementsByTagName( 'testsuites' ).Item( 0 );
+            $failures = $oSystem_Xml_XmlElement.GetAttribute( 'failures' );
+            $errors = $oSystem_Xml_XmlElement.GetAttribute( 'errors' );
+            echo "gtest_failures=$failures"
+            echo "gtest_errors=$errors"
           }
           }
 

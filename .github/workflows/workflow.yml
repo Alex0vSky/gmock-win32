@@ -42,8 +42,7 @@ jobs:
           # mv -v ${{ github.workspace }}\bin\$strPlatform\$strConfiguration\${{ env.strOutName }}.${{ env.strOutExt }} $dst
           # Compress-Archive -Path "$dst" -DestinationPath "${dst}.zip"
         run: | # pwsh
-          echo 3
-          echo ${{ steps.msbuild-setup.outputs.msbuildPath }}
+          echo "${{ steps.msbuild-setup.outputs.msbuildPath }}"
           $arrSources = @( 
             'main.cpp'
             'from0ToMax.cpp' 
@@ -56,15 +55,15 @@ jobs:
           );
           @( '/std:c++14', '/std:c++17', '/std:c++20', '/std:c++23' ) | % { $strCppVer=$_; }; #later
           
-          $path = vswhere -products * -requires Microsoft.Component.MSBuild -property installationPath -latest
-          echo $path
+          $pathMSBuild = vswhere -products * -requires Microsoft.Component.MSBuild -property installationPath -latest
+          echo $pathMSBuild
           echo "combinations"
           @( 'x86', 'x64' ) | % { $strArch=$_; 
             if ( 'x64' -eq $strArch ) {
-              $path = join-path $path 'VC/Auxiliary/Build/vcvars64.bat'
+              $path = join-path $pathMSBuild 'VC/Auxiliary/Build/vcvars64.bat'
             }
             else {
-              $path = join-path $path 'VC/Auxiliary/Build/vcvars32.bat'
+              $path = join-path $pathMSBuild 'VC/Auxiliary/Build/vcvars32.bat'
             }
             cmd /s /c """$path"" $args && set" | where { $_ -match '(\w+)=(.*)' } | foreach {
               $null = new-item -force -path "Env:\$($Matches[1])" -value $Matches[2]
@@ -72,13 +71,13 @@ jobs:
           @( 'msvc', 'llvm' ) | % { $strToolSet=$_; 
             if ( 'msvc' -eq $strToolSet ) {
               $exe = 'cl'
-              $compile = ''
+              $compile = '/MP '
             } elseif ( 'llvm' -eq $strToolSet ) {
               $exe = 'clang-cl'
               $compile = '-Wno-ignored-pragma-optimize -Wno-microsoft-include -Wno-microsoft-cast -fms-compatibility -fms-extensions '
             }
             $compile += ('' +
-            " /EHsc /MP " +
+            " /EHsc " +
             " /I""../include"" /I""${{ env.strDirGTest }}/googletest/include"" /I""${{ env.strDirGTest }}/googletest"" /I""${{ env.strDirGTest }}/googlemock/include"" /I""${{ env.strDirGTest }}/googlemock"" " +
             " ""../src/${{ env.strFirstObj }}.cpp"" " +
             " ""${{ env.strDirGTest }}/googletest/src/gtest-all.cc"" " +
@@ -88,12 +87,12 @@ jobs:
             ( $arrLibs -join ' ' ) +
             " /machine:$strArch " + 
             '')
-            echo $exe;
-            echo $compile;
+            echo "strArch=$strArch"
+            echo "exe=$exe"
             Start-Process $exe -ArgumentList $compile -Wait -NoNewWindow
             
+            Remove-Item -Path "${{ env.strDefaultGtestOutput }}"
             Start-Process "$env:strFirstObj.exe" -ArgumentList "--gtest_output=xml" -Wait
-            cat "${{ env.strDefaultGtestOutput }}"
             [xml]$oSystem_Xml_XmlDocument = Get-Content "${{ env.strDefaultGtestOutput }}"
             $oSystem_Xml_XmlElement = $oSystem_Xml_XmlDocument.GetElementsByTagName( 'testsuites' ).Item( 0 );
             $failures = $oSystem_Xml_XmlElement.GetAttribute( 'failures' );

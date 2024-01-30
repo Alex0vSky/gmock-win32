@@ -91,7 +91,9 @@ jobs:
             echo "exe=$exe"
             Start-Process $exe -ArgumentList $compile -Wait -NoNewWindow
             
-            Remove-Item -Path "${{ env.strDefaultGtestOutput }}"
+            if ( TestPpath "${{ env.strDefaultGtestOutput }}" ) {
+              Remove-Item -Path "${{ env.strDefaultGtestOutput }}"
+            }
             Start-Process "$env:strFirstObj.exe" -ArgumentList "--gtest_output=xml" -Wait
             [xml]$oSystem_Xml_XmlDocument = Get-Content "${{ env.strDefaultGtestOutput }}"
             $oSystem_Xml_XmlElement = $oSystem_Xml_XmlDocument.GetElementsByTagName( 'testsuites' ).Item( 0 );

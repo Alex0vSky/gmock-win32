@@ -42,8 +42,6 @@ jobs:
           # mv -v ${{ github.workspace }}\bin\$strPlatform\$strConfiguration\${{ env.strOutName }}.${{ env.strOutExt }} $dst
           # Compress-Archive -Path "$dst" -DestinationPath "${dst}.zip"
         run: | # pwsh
-          echo 1
-          echo ${{ steps.msbuild-setup.outputs.stdout }}
           echo 2
           echo ${{ join( steps.msbuild-setup.outputs.*, '\n') }}
           $arrSources = @( 

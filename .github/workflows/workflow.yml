@@ -36,13 +36,16 @@ jobs:
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v1.1
+        id: msbuild-setup
 
       - name: Build all tests
           # mv -v ${{ github.workspace }}\bin\$strPlatform\$strConfiguration\${{ env.strOutName }}.${{ env.strOutExt }} $dst
           # Compress-Archive -Path "$dst" -DestinationPath "${dst}.zip"
         run: | # pwsh
-          dir ${{ env.strDirGTest }}/googletest/include
-          dir ${{ env.strDirGTest }}/googlemock/include
+          echo 1
+          echo ${{ steps.msbuild-setup.outputs.stdout }}
+          echo 2
+          echo ${{ join( steps.msbuild-setup.outputs.*, '\n') }}
           $arrSources = @( 
             'main.cpp'
             'from0ToMax.cpp' 
@@ -78,7 +81,7 @@ jobs:
             }
             $compile += ('' +
             " /EHsc /MP " +
-            " /I""../include"" /I""${{ env.strDirGTest }}/googletest/include"" /I""${{ env.strDirGTest }}/googlemock/include"" " +
+            " /I""../include"" /I""${{ env.strDirGTest }}/googletest/include"" /I""${{ env.strDirGTest }}/googletest/src"" /I""${{ env.strDirGTest }}/googlemock/include"" /I""${{ env.strDirGTest }}/googlemock/src"" " +
             " ""../src/${{ env.strFirstObj }}.cpp"" " +
             " ""${{ env.strDirGTest }}/googletest/src/gtest-all.cc"" " +
             " ""${{ env.strDirGTest }}/googlemock/src/gmock-all.cc"" " +

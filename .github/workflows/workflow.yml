@@ -42,6 +42,9 @@ jobs:
           # mv -v ${{ github.workspace }}\bin\$strPlatform\$strConfiguration\${{ env.strOutName }}.${{ env.strOutExt }} $dst
           # Compress-Archive -Path "$dst" -DestinationPath "${dst}.zip"
         run: | # pwsh
+          dir ${{ env.strDirGTest }}
+          dir ${{ env.strDirGTest }}/googletest/include
+          dir ${{ env.strDirGTest }}/googlemock/include
           $arrSources = @( 
             'main.cpp'
             'from0ToMax.cpp' 
@@ -61,12 +64,12 @@ jobs:
             }
             $compile += ('' +
             " /EHsc /MP " +
-            " /I""../include"" /I""$env:strDirGTest/gmock/include"" /I""$env:strDirGTest/gmock/include"" " +
-            " ""../src/$env:strFirstObj.cpp"" " +
-            " ""$env:strDirGTest/gmock/src/gtest/gtest-all.cc"" " +
-            " ""$env:strDirGTest/gmock/src/gmock/gmock-all.cc"" " +
+            " /I""../include"" /I""${{ env.strDirGTest }}/googletest/include"" /I""${{ env.strDirGTest }}/googlemock/include"" " +
+            " ""../src/${{ env.strFirstObj }}.cpp"" " +
+            " ""${{ env.strDirGTest }}/googletest/src/gtest-all.cc"" " +
+            " ""${{ env.strDirGTest }}/googlemock/src/gmock-all.cc"" " +
             ( $arrSources -join ' ' ) +
-            " /link kernel32.lib advapi32.lib gdi32.lib user32.lib /machine:$strArch " + 
+            " /link kernel32.lib advapi32.lib gdi32.lib user32.lib /machine:$strArch " +
             '')
             echo $compile;
           }

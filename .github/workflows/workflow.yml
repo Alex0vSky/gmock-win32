@@ -2,27 +2,26 @@ name: tests
 on: { workflow_dispatch, push: { paths-ignore: [ 'README.md', 'LICENSE' ] } }
 # Configuration
 env:
-  strDirGTest: "ThirdParty"
-  strTestExecutable: test.exe
+  strDirTests: "tests"
+  strDirGTest: "ThirdParty/googletest"
+  strFirstObj: "gmock-win32"
+  strDefaultGtestOutput: "test_detail.xml"
 jobs:
-  build-tests-gtest:
+  job-single:
     runs-on: windows-latest
+    defaults: 
+        run:
+            working-directory: ${{ env.strDirTests }}
     steps:
       - uses: actions/checkout@v3
       
-      - name: Download googleTestLatestRepo
+      - name: Get version googleTestLatestRepo
         id: gtest-tag
         uses: pozetroninc/github-action-get-latest-release@master
         with:
           repository: google/googletest
           token: ${{ secrets.GITHUB_TOKEN }}
   
-      - name: Show log 1
-        run: | # pwsh
-          echo "dir1"
-          dir
-          echo "release=${{ steps.gtest-tag.outputs.release }}"
-
       - name: Cache googleTestLatestRepo
         uses: actions/cache@v3
         with:
@@ -35,20 +34,60 @@ jobs:
         run: | # pwsh
           git clone --depth 1 --branch ${{ steps.gtest-tag.outputs.release }} https://github.com/google/googletest.git "${{ env.strDirGTest }}"
 
-      - name: Show log 2
-        run: | # pwsh
-          echo "dir1"
-          dir
-          echo "dir2"
-          dir ${{ env.strDirGTest }}
-
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v1.1
 
-      # - name: Build test
-        # run: MSBuild test/test.sln -noLogo -verbosity:quiet -m -p:Platform=${env:strPlatform} -p:Configuration=${env:strConfiguration} 
+      - name: Build all tests
+        continue-on-error: true
+          # mv -v ${{ github.workspace }}\bin\$strPlatform\$strConfiguration\${{ env.strOutName }}.${{ env.strOutExt }} $dst
+          # Compress-Archive -Path "$dst" -DestinationPath "${dst}.zip"
+        run: | # pwsh
+          $arrSources = @( 
+            'main.cpp'
+            'from0ToMax.cpp' 
+          );
+          echo "combinations"
+          @( 'x86', 'x64' ) | % { $strArch=$_; 
+          @( 'msvc', 'llvm' ) | % { $strToolSet=$_; 
+          @( 'Debug', 'Release' ) | % { $strCfg=$_; 
+          @( 'FullOptimize', 'NoOptimize' ) | % { $strOptimize=$_; 
+          @( 'std:c++14', 'std:c++17', 'std:c++20', 'std:c++23' ) | % { $strCppVer=$_; 
+            if ( 'msvc' -eq $strToolSet ) {
+              $process = 'cl'
+              $compile = ''
+            } elseif ( 'llvm' -eq $strToolSet ) {
+              $process = 'clang-cl'
+              $compile = '-Wno-ignored-pragma-optimize -Wno-microsoft-include -Wno-microsoft-cast -fms-compatibility -fms-extensions '
+            }
+            $compile += ('' +
+            " /EHsc /MP " +
+            " /I""../include"" /I""$env:strDirGTest/gmock/include"" /I""$env:strDirGTest/gmock/include"" " +
+            " ""../src/$env:strFirstObj.cpp"" " +
+            " ""$env:strDirGTest/gmock/src/gtest/gtest-all.cc"" " +
+            " ""$env:strDirGTest/gmock/src/gmock/gmock-all.cc"" " +
+            ( $arrSources -join ' ' ) +
+            " /link kernel32.lib advapi32.lib gdi32.lib user32.lib /machine:$strArch " + 
+            '')
+            echo $compile;
+          }
+          }
+          }
+          }
+          }
+          Start-Process "${{ env.strFirstObj }}.exe" -ArgumentList "--gtest_output=xml" -Wait
+          cat "${{ env.strDefaultGtestOutput }}"
+          [xml]$oSystem_Xml_XmlDocument = Get-Content "${{ env.strDefaultGtestOutput }}"
+          $oSystem_Xml_XmlElement = $oSystem_Xml_XmlDocument.GetElementsByTagName( 'testsuites' ).Item( 0 );
+          $failures = $oSystem_Xml_XmlElement.GetAttribute( 'failures' );
+          $errors = $oSystem_Xml_XmlElement.GetAttribute( 'errors' );
+          echo "gtest_failures=$failures"
+          echo "gtest_errors=$errors"
 
-      # - name: Run test
+      - name: If failure
+        if: ${{ failure( ) }}
+        run: | # pwsh
+          echo "tmp echo"
+
+      # - name: Run all tests
         # run: | # pwsh
-          # $arglist="--logfile?"
           # $strResult = Start-Process -Wait -NoNewWindow "${{env.strTestExecutable}}"

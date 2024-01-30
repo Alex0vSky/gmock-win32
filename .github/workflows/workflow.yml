@@ -42,8 +42,8 @@ jobs:
           # mv -v ${{ github.workspace }}\bin\$strPlatform\$strConfiguration\${{ env.strOutName }}.${{ env.strOutExt }} $dst
           # Compress-Archive -Path "$dst" -DestinationPath "${dst}.zip"
         run: | # pwsh
-          echo 2
-          echo ${{ join( steps.msbuild-setup.outputs.*, '\n') }}
+          echo 3
+          echo ${{ steps.msbuild-setup.outputs.msbuildPath }}
           $arrSources = @( 
             'main.cpp'
             'from0ToMax.cpp' 
@@ -79,7 +79,7 @@ jobs:
             }
             $compile += ('' +
             " /EHsc /MP " +
-            " /I""../include"" /I""${{ env.strDirGTest }}/googletest/include"" /I""${{ env.strDirGTest }}/googletest/src"" /I""${{ env.strDirGTest }}/googlemock/include"" /I""${{ env.strDirGTest }}/googlemock/src"" " +
+            " /I""../include"" /I""${{ env.strDirGTest }}/googletest/include"" /I""${{ env.strDirGTest }}/googletest"" /I""${{ env.strDirGTest }}/googlemock/include"" /I""${{ env.strDirGTest }}/googlemock"" " +
             " ""../src/${{ env.strFirstObj }}.cpp"" " +
             " ""${{ env.strDirGTest }}/googletest/src/gtest-all.cc"" " +
             " ""${{ env.strDirGTest }}/googlemock/src/gmock-all.cc"" " +

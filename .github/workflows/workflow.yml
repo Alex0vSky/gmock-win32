@@ -36,12 +36,69 @@ jobs:
 
       - name: Build and run all tests
         run: | # pwsh
+          $arrSources = @( 
+            'main.cpp'
+            'from0ToMax.cpp' 
+          );
+          $arrLibs = @( 
+            'kernel32.lib'
+            'advapi32.lib'
+            'gdi32.lib'
+            'user32.lib'
+          );
+          
           $pathMSBuild = vswhere -products * -requires Microsoft.Component.MSBuild -property installationPath -latest
-          $path = join-path $pathMSBuild 'VC/Auxiliary/Build/vcvars32.bat'
-          cmd /s /c """$path"" $args && set" | where { $_ -match '(\w+)=(.*)' } | foreach {
-            $null = new-item -force -path "Env:\$($Matches[1])" -value $Matches[2]
+          @( 'x86', 'x64' ) | % { $strArch=$_; 
+            if ( 'x64' -eq $strArch ) {
+              $path = join-path $pathMSBuild 'VC/Auxiliary/Build/vcvars64.bat'
+            }
+            else {
+              $path = join-path $pathMSBuild 'VC/Auxiliary/Build/vcvars32.bat'
+            }
+            cmd /s /c """$path"" $args && set" | where { $_ -match '(\w+)=(.*)' } | foreach {
+              $null = new-item -force -path "Env:\$($Matches[1])" -value $Matches[2]
+            }
+          @( 'msvc', 'llvm' ) | % { $strToolSet=$_; 
+          @( '/std:c++14', '/std:c++17', '/std:c++20' ) | % { $strCppVer=$_;
+            if ( 'msvc' -eq $strToolSet ) {
+              $exe = 'cl'
+              $compile = '/MP '
+            } elseif ( 'llvm' -eq $strToolSet ) {
+              $exe = 'clang-cl'
+              $compile = '-Wno-ignored-pragma-optimize -Wno-microsoft-include -Wno-microsoft-cast -fms-compatibility -fms-extensions '
+            }
+            $compile += ('' +
+              " /EHsc /nologo " +
+              " $strCppVer " +
+              " /I""../include"" /I""${{ env.strDirGTest }}/googletest/include"" /I""${{ env.strDirGTest }}/googletest"" /I""${{ env.strDirGTest }}/googlemock/include"" /I""${{ env.strDirGTest }}/googlemock"" " +
+              " ""../src/${{ env.strFirstObj }}.cpp"" " +
+              " ""${{ env.strDirGTest }}/googletest/src/gtest-all.cc"" " +
+              " ""${{ env.strDirGTest }}/googlemock/src/gmock-all.cc"" " +
+              ( $arrSources -join ' ' ) +
+              " /link " +
+              ( $arrLibs -join ' ' ) +
+              " /machine:$strArch " + 
+              '')
+            echo "strArch=$strArch, strCppVer=$strCppVer, exe=$exe"
+            if ( ( 'x86' -eq $strArch ) -And ( 'llvm' -eq $strToolSet ) ) {
+                $compile += " -m32 "
+            }
+            $process = Start-Process $exe -ArgumentList $compile -Wait -NoNewWindow -PassThru
+            echo $process.ExitCode;
+            if ( 0 -eq $process.ExitCode ) {
+              Start-Process "${{ env.strFirstObj }}.exe" -ArgumentList "--gtest_output=xml" -Wait
+              [xml]$oSystem_Xml_XmlDocument = Get-Content "${{ env.strDefaultGtestOutput }}"
+              $oSystem_Xml_XmlElement = $oSystem_Xml_XmlDocument.GetElementsByTagName( 'testsuites' ).Item( 0 );
+              $failures = $oSystem_Xml_XmlElement.GetAttribute( 'failures' );
+              $errors = $oSystem_Xml_XmlElement.GetAttribute( 'errors' );
+              echo "gtest_failures=$failures"
+              echo "gtest_errors=$errors"
+              Remove-Item -Path "${{ env.strFirstObj }}.exe"
+              Remove-Item -Path "${{ env.strDefaultGtestOutput }}"
+            }
           }
-          Start-Process 'clang-cl' -ArgumentList '--version' -Wait -NoNewWindow
+          }
+          }
 
       - name: If success
         if: ${{ success( ) }}

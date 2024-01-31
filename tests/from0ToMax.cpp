@@ -3,6 +3,9 @@
 #include "gmock-win32.h"
 #include <Windows.h>
 
+// 'reinterpret_cast': pointer truncation from 'HANDLE' to 'DWORD'
+#pragma warning( disable: 4311 )
+
 // 0
 MOCK_STDCALL_FUNC( HWINSTA, AnyPopup );
 // 1

@@ -67,6 +67,9 @@ jobs:
               $exe = 'clang-cl'
               $compile = '-Wno-ignored-pragma-optimize -Wno-microsoft-include -Wno-microsoft-cast -fms-compatibility -fms-extensions '
             }
+            if ( ( 'x86' -eq $strArch ) -And ( 'llvm' -eq $strToolSet ) ) {
+                $compile += " -m32 "
+            }
             $compile += ('' +
               " /EHsc /nologo " +
               " $strCppVer " +
@@ -80,9 +83,6 @@ jobs:
               " /machine:$strArch " + 
               '')
             echo "strArch=$strArch, strCppVer=$strCppVer, exe=$exe"
-            if ( ( 'x86' -eq $strArch ) -And ( 'llvm' -eq $strToolSet ) ) {
-                $compile += " -m32 "
-            }
             $process = Start-Process $exe -ArgumentList $compile -Wait -NoNewWindow -PassThru
             echo $process.ExitCode;
             if ( 0 -eq $process.ExitCode ) {

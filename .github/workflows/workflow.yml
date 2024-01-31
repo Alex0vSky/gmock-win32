@@ -50,7 +50,6 @@ jobs:
             'gdi32.lib'
             'user32.lib'
           );
-          @( '/std:c++14', '/std:c++17', '/std:c++20', '/std:c++23' ) | % { $strCppVer=$_; }; #later
           
           $pathMSBuild = vswhere -products * -requires Microsoft.Component.MSBuild -property installationPath -latest
           echo $pathMSBuild
@@ -66,7 +65,8 @@ jobs:
               $null = new-item -force -path "Env:\$($Matches[1])" -value $Matches[2]
             }
           @( 'msvc', 'llvm' ) | % { $strToolSet=$_; 
-          $strCppVer = '/std:c++14'; # tmp
+            ; #$strCppVer = '/std:c++14'; # tmp
+          @( '/std:c++14', '/std:c++17', '/std:c++20', '/std:c++23' ) | % { $strCppVer=$_;
             if ( 'msvc' -eq $strToolSet ) {
               $exe = 'cl'
               $compile = '/MP '
@@ -86,9 +86,7 @@ jobs:
               ( $arrLibs -join ' ' ) +
               " /machine:$strArch " + 
               '')
-            echo "strArch=$strArch"
-            echo "strCppVer=$strCppVer"
-            echo "exe=$exe"
+            echo "strArch=$strArch, strCppVer=$strCppVer, exe=$exe"
             $process = Start-Process $exe -ArgumentList $compile -Wait -NoNewWindow -PassThru
             echo $process.ExitCode;
             if ( 0 -eq $process.ExitCode ) {
@@ -102,6 +100,7 @@ jobs:
               Remove-Item -Path "${{ env.strFirstObj }}.exe"
               Remove-Item -Path "${{ env.strDefaultGtestOutput }}"
             }
+          }
           }
           }
 

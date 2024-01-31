@@ -9,13 +9,7 @@ env:
 jobs:
   single-job:
     runs-on: windows-latest
-    # Run a job for each of the specified target architectures:
-    strategy:
-      matrix:
-        arch:
-          - x86
-          - x64
-    defaults:
+    defaults: 
         run:
             working-directory: ${{ env.strDirTests }}
     steps:
@@ -40,11 +34,13 @@ jobs:
         run: | # pwsh
           git clone --depth 1 --branch ${{ steps.gtest-tag.outputs.release }} https://github.com/google/googletest.git "${{ env.strDirGTest }}"
 
-      - uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: ${{ matrix.arch }}
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v1.1
+        id: msbuild-setup
+
       - name: Build all tests
         run: | # pwsh
+          echo "${{ steps.msbuild-setup.outputs.msbuildPath }}"
           $arrSources = @( 
             'main.cpp'
             'from0ToMax.cpp' 
@@ -57,8 +53,21 @@ jobs:
           );
           @( '/std:c++14', '/std:c++17', '/std:c++20', '/std:c++23' ) | % { $strCppVer=$_; }; #later
           
+          $pathMSBuild = vswhere -products * -requires Microsoft.Component.MSBuild -property installationPath -latest
+          echo $pathMSBuild
           echo "combinations"
+          @( 'x86', 'x64' ) | % { $strArch=$_; 
+            if ( 'x64' -eq $strArch ) {
+              $path = join-path $pathMSBuild 'VC/Auxiliary/Build/vcvars64.bat'
+            }
+            else {
+              $path = join-path $pathMSBuild 'VC/Auxiliary/Build/vcvars32.bat'
+            }
+            cmd /s /c """$path"" $args && set" | where { $_ -match '(\w+)=(.*)' } | foreach {
+              $null = new-item -force -path "Env:\$($Matches[1])" -value $Matches[2]
+            }
           @( 'msvc', 'llvm' ) | % { $strToolSet=$_; 
+          $strCppVer = '/std:c++14'; # tmp
             if ( 'msvc' -eq $strToolSet ) {
               $exe = 'cl'
               $compile = '/MP '
@@ -68,6 +77,7 @@ jobs:
             }
             $compile += ('' +
             " /EHsc " +
+            " $strCppVer " +
             " /I""../include"" /I""${{ env.strDirGTest }}/googletest/include"" /I""${{ env.strDirGTest }}/googletest"" /I""${{ env.strDirGTest }}/googlemock/include"" /I""${{ env.strDirGTest }}/googlemock"" " +
             " ""../src/${{ env.strFirstObj }}.cpp"" " +
             " ""${{ env.strDirGTest }}/googletest/src/gtest-all.cc"" " +
@@ -75,15 +85,13 @@ jobs:
             ( $arrSources -join ' ' ) +
             " /link " +
             ( $arrLibs -join ' ' ) +
-            " /machine:${{ matrix.arch }} " + 
+            " /machine:$strArch " + 
             '')
-            echo "strArch=${{ matrix.arch }}"
+            echo "strArch=$strArch"
+            echo "strCppVer=$strCppVer"
             echo "exe=$exe"
             Start-Process $exe -ArgumentList $compile -Wait -NoNewWindow
             
-            if ( Test-Path "${{ env.strDefaultGtestOutput }}" ) {
-              Remove-Item -Path "${{ env.strDefaultGtestOutput }}"
-            }
             Start-Process "$env:strFirstObj.exe" -ArgumentList "--gtest_output=xml" -Wait
             [xml]$oSystem_Xml_XmlDocument = Get-Content "${{ env.strDefaultGtestOutput }}"
             $oSystem_Xml_XmlElement = $oSystem_Xml_XmlDocument.GetElementsByTagName( 'testsuites' ).Item( 0 );
@@ -91,6 +99,8 @@ jobs:
             $errors = $oSystem_Xml_XmlElement.GetAttribute( 'errors' );
             echo "gtest_failures=$failures"
             echo "gtest_errors=$errors"
+            Remove-Item -Path "${{ env.strDefaultGtestOutput }}"
+          }
           }
 
       - name: If success
@@ -101,3 +111,7 @@ jobs:
         if: ${{ failure( ) }}
         run: | # pwsh
           echo "tmp echo"
+
+      # - name: Run all tests
+        # run: | # pwsh
+          # $strResult = Start-Process -Wait -NoNewWindow "${{env.strTestExecutable}}"

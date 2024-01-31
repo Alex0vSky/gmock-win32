@@ -25,7 +25,7 @@ jobs:
       - name: Cache googleTestLatestRepo
         uses: actions/cache@v3
         with:
-          path: ${{ env.strDirGTest }}
+          path: ./${{ env.strDirTests }}/${{ env.strDirGTest }}
           key: cache-key-gtest-${{ steps.gtest-tag.outputs.release }}
         id: cache-gtest
 
@@ -34,13 +34,12 @@ jobs:
         run: | # pwsh
           git clone --depth 1 --branch ${{ steps.gtest-tag.outputs.release }} https://github.com/google/googletest.git "${{ env.strDirGTest }}"
 
+      # outputs.msbuildPath = C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v1.1
-        id: msbuild-setup
 
       - name: Build all tests
         run: | # pwsh
-          echo "${{ steps.msbuild-setup.outputs.msbuildPath }}"
           $arrSources = @( 
             'main.cpp'
             'from0ToMax.cpp' 
@@ -76,7 +75,7 @@ jobs:
               $compile = '-Wno-ignored-pragma-optimize -Wno-microsoft-include -Wno-microsoft-cast -fms-compatibility -fms-extensions '
             }
             $compile += ('' +
-            " /EHsc " +
+            " /EHsc /nologo " +
             " $strCppVer " +
             " /I""../include"" /I""${{ env.strDirGTest }}/googletest/include"" /I""${{ env.strDirGTest }}/googletest"" /I""${{ env.strDirGTest }}/googlemock/include"" /I""${{ env.strDirGTest }}/googlemock"" " +
             " ""../src/${{ env.strFirstObj }}.cpp"" " +
@@ -90,16 +89,20 @@ jobs:
             echo "strArch=$strArch"
             echo "strCppVer=$strCppVer"
             echo "exe=$exe"
-            Start-Process $exe -ArgumentList $compile -Wait -NoNewWindow
+            $process = Start-Process $exe -ArgumentList $compile -Wait -NoNewWindow -PassThru
+            echo $process.ExitCode;
             
-            Start-Process "$env:strFirstObj.exe" -ArgumentList "--gtest_output=xml" -Wait
-            [xml]$oSystem_Xml_XmlDocument = Get-Content "${{ env.strDefaultGtestOutput }}"
-            $oSystem_Xml_XmlElement = $oSystem_Xml_XmlDocument.GetElementsByTagName( 'testsuites' ).Item( 0 );
-            $failures = $oSystem_Xml_XmlElement.GetAttribute( 'failures' );
-            $errors = $oSystem_Xml_XmlElement.GetAttribute( 'errors' );
-            echo "gtest_failures=$failures"
-            echo "gtest_errors=$errors"
-            Remove-Item -Path "${{ env.strDefaultGtestOutput }}"
+            if ( Test-Path "${{ env.strFirstObj }}" ) {
+              Start-Process "${{ env.strFirstObj }}.exe" -ArgumentList "--gtest_output=xml" -Wait
+              [xml]$oSystem_Xml_XmlDocument = Get-Content "${{ env.strDefaultGtestOutput }}"
+              $oSystem_Xml_XmlElement = $oSystem_Xml_XmlDocument.GetElementsByTagName( 'testsuites' ).Item( 0 );
+              $failures = $oSystem_Xml_XmlElement.GetAttribute( 'failures' );
+              $errors = $oSystem_Xml_XmlElement.GetAttribute( 'errors' );
+              echo "gtest_failures=$failures"
+              echo "gtest_errors=$errors"
+              Remove-Item -Path "${{ env.strFirstObj }}"
+              Remove-Item -Path "${{ env.strDefaultGtestOutput }}"
+            }
           }
           }
 

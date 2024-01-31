@@ -84,7 +84,6 @@ jobs:
               ( $arrSources -join ' ' ) +
               " /link " +
               ( $arrLibs -join ' ' ) +
-              " /machine:$strArch " + 
               '')
             echo "strArch=$strArch, strCppVer=$strCppVer, exe=$exe"
             $process = Start-Process $exe -ArgumentList $compile -Wait -NoNewWindow -PassThru

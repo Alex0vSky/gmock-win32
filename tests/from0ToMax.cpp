@@ -5,6 +5,10 @@
 
 // 'reinterpret_cast': pointer truncation from 'HANDLE' to 'DWORD'
 #pragma warning( disable: 4311 )
+// cast to smaller integer type 'unsigned long' from 'void *'
+#ifdef __clang__
+#	pragma clang diagnostic ignored "-Wvoid-pointer-to-int-cast"
+#endif // __clang__
 
 // 0
 MOCK_STDCALL_FUNC( HWINSTA, AnyPopup );

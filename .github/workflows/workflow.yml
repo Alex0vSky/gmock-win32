@@ -84,8 +84,12 @@ jobs:
               ( $arrSources -join ' ' ) +
               " /link " +
               ( $arrLibs -join ' ' ) +
+              " /machine:$strArch " + 
               '')
             echo "strArch=$strArch, strCppVer=$strCppVer, exe=$exe"
+            if ( 'llvm' -eq $strToolSet ) {
+                Start-Process $exe -ArgumentList '--version' -Wait -NoNewWindow
+            }
             $process = Start-Process $exe -ArgumentList $compile -Wait -NoNewWindow -PassThru
             echo $process.ExitCode;
             if ( 0 -eq $process.ExitCode ) {

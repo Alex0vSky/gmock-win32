@@ -7,9 +7,15 @@ env:
   strFirstObj: "gmock-win32"
   strDefaultGtestOutput: "test_detail.xml"
 jobs:
-  job-single:
+  single-job:
     runs-on: windows-latest
-    defaults: 
+    # Run a job for each of the specified target architectures:
+    strategy:
+      matrix:
+        arch:
+          - x86
+          - x64
+    defaults:
         run:
             working-directory: ${{ env.strDirTests }}
     steps:
@@ -34,15 +40,11 @@ jobs:
         run: | # pwsh
           git clone --depth 1 --branch ${{ steps.gtest-tag.outputs.release }} https://github.com/google/googletest.git "${{ env.strDirGTest }}"
 
-      - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v1.1
-        id: msbuild-setup
-
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
       - name: Build all tests
-          # mv -v ${{ github.workspace }}\bin\$strPlatform\$strConfiguration\${{ env.strOutName }}.${{ env.strOutExt }} $dst
-          # Compress-Archive -Path "$dst" -DestinationPath "${dst}.zip"
         run: | # pwsh
-          echo "${{ steps.msbuild-setup.outputs.msbuildPath }}"
           $arrSources = @( 
             'main.cpp'
             'from0ToMax.cpp' 
@@ -55,19 +57,7 @@ jobs:
           );
           @( '/std:c++14', '/std:c++17', '/std:c++20', '/std:c++23' ) | % { $strCppVer=$_; }; #later
           
-          $pathMSBuild = vswhere -products * -requires Microsoft.Component.MSBuild -property installationPath -latest
-          echo $pathMSBuild
           echo "combinations"
-          @( 'x86', 'x64' ) | % { $strArch=$_; 
-            if ( 'x64' -eq $strArch ) {
-              $path = join-path $pathMSBuild 'VC/Auxiliary/Build/vcvars64.bat'
-            }
-            else {
-              $path = join-path $pathMSBuild 'VC/Auxiliary/Build/vcvars32.bat'
-            }
-            cmd /s /c """$path"" $args && set" | where { $_ -match '(\w+)=(.*)' } | foreach {
-              $null = new-item -force -path "Env:\$($Matches[1])" -value $Matches[2]
-            }
           @( 'msvc', 'llvm' ) | % { $strToolSet=$_; 
             if ( 'msvc' -eq $strToolSet ) {
               $exe = 'cl'
@@ -85,13 +75,13 @@ jobs:
             ( $arrSources -join ' ' ) +
             " /link " +
             ( $arrLibs -join ' ' ) +
-            " /machine:$strArch " + 
+            " /machine:${{ matrix.arch }} " + 
             '')
-            echo "strArch=$strArch"
+            echo "strArch=${{ matrix.arch }}"
             echo "exe=$exe"
             Start-Process $exe -ArgumentList $compile -Wait -NoNewWindow
             
-            if ( TestPpath "${{ env.strDefaultGtestOutput }}" ) {
+            if ( Test-Path "${{ env.strDefaultGtestOutput }}" ) {
               Remove-Item -Path "${{ env.strDefaultGtestOutput }}"
             }
             Start-Process "$env:strFirstObj.exe" -ArgumentList "--gtest_output=xml" -Wait
@@ -102,7 +92,6 @@ jobs:
             echo "gtest_failures=$failures"
             echo "gtest_errors=$errors"
           }
-          }
 
       - name: If success
         if: ${{ success( ) }}
@@ -112,7 +101,3 @@ jobs:
         if: ${{ failure( ) }}
         run: | # pwsh
           echo "tmp echo"
-
-      # - name: Run all tests
-        # run: | # pwsh
-          # $strResult = Start-Process -Wait -NoNewWindow "${{env.strTestExecutable}}"
